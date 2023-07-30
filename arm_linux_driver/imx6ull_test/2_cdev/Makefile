@@ -7,6 +7,10 @@ PWD?=$(shell pwd)
 # 进入到Makefile路径，并使用该目录下的源码编译驱动模块
 all:
 	make -C $(KDIR) M=$(PWD) modules
+
+test:app_test/gpio_test.c
+	$(CROSS_COMPILE)gcc $^ -o a.out
+
 # 删除产生的文件
 clean:
 	rm -r *.ko *.mod.o *.mod.c *.symvers *.order

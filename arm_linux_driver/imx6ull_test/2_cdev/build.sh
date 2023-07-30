@@ -1,25 +1,33 @@
 
-echo "copy source  ............"
+set -e # 出错就停止
+echo ""
+echo "<<<<<<<<<<<<<< strt >>>>>>>>>>>>>>"
+
+echo ""
+echo "============== copy source  =============="
 BUILD_DIR=~/ARM-Linux/build # 虚拟机编译目录
 mkdir -p ${BUILD_DIR}
 rm -rf ${BUILD_DIR}/*
 cp -r ./* ${BUILD_DIR}
 cd ${BUILD_DIR}
-
 pwd
 
-echo "build   ............"
+echo ""
+echo "============== build =============="
 export ARCH=arm
 export CROSS_COMPILE=arm-linux-gnueabihf-
 make
+make test
 
-echo "copy *.ko to rootfs........."
-TARGET_DIR=~/share/nfs_share/rootfs/root/test # 开发板网络挂载根文件系统
-mkdir -p ${TARGET_DIR}
-cp *.ko ${TARGET_DIR}/
-
-echo "target dir:${TARGET_DIR}  "
-ls ${TARGET_DIR}
 echo ""
+echo "============== copy to rootfs =============="
+RUN_DIR=~/share/nfs_share/rootfs/root/test # 开发板网络挂载根文件系统目录
+mkdir -p ${RUN_DIR}
+cp *.ko ${RUN_DIR}/
+cp a.out ${RUN_DIR}/
 
-echo "end ........."
+echo "RUN_DIR:${RUN_DIR}"
+ls ${RUN_DIR}
+
+echo ""
+echo "<<<<<<<<<<<<<< end >>>>>>>>>>>>>>"
