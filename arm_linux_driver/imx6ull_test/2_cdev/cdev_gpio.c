@@ -164,6 +164,12 @@ static void gpio_exit(void)
 
     dev_register_unremap(); // 释放资源
 }
+
+/**
+ * 最简单的字符设备驱动
+ * 需要 申请设备号，注册文件操作方法集，创建 类 和 设备节点
+*/
+
 /* 必须使用宏指定 加载函数、卸载函数、GPL声明 */
 module_init(gpio_init);
 module_exit(gpio_exit);

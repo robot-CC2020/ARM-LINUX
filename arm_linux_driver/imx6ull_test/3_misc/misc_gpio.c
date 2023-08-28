@@ -145,7 +145,6 @@ struct miscdevice my_misc_dev = {
     .fops = &op,
 };
 
-
 // 加载函数
 static int misc_init(void)
 {
@@ -162,6 +161,14 @@ static void misc_exit(void)
     misc_deregister(&my_misc_dev);
     deinit_devs(g_dev_list);
 }
+
+/**
+ * 杂项设备可以省略 class 和 dev 节点的创建过程，也不需要申请主设备号。
+ * 使用杂项设备 可以节省主设备号资源，节省代码量。
+ * 杂项设备主设备号固定为10， dev 节点名字由 struct miscdevice 的name字段指定。
+ * 使用 文件私有数据 private_data 可以让代码复用性更高。
+*/
+
 /* 必须使用宏指定 加载函数、卸载函数、GPL声明 */
 module_init(misc_init);
 module_exit(misc_exit);

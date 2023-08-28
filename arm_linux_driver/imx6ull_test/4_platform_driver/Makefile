@@ -1,5 +1,5 @@
 # -m 表示编译成模块
-obj-m += misc_gpio.o
+obj-m += platform_driver.o platform_device.o
 # 以绝对路径的方式指向内核源码路径
 KDIR:=/home/pdg/ARM-Linux/current_uboot_linux/linux-imx-4.1.15
 # Makefile 所在路径

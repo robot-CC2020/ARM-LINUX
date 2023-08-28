@@ -5,6 +5,8 @@
 #include <linux/fs.h>
 /* 杂项设备头文件 */
 #include <linux/miscdevice.h>
+/* 平台设备头文件 */
+#include <linux/platform_device.h>
 /* 设备节点创建 */
 #include <linux/device.h>
 /* ioremap */
@@ -132,6 +134,7 @@ static int misc_release(struct inode *node, struct file *file)
     return 0;
 }
 
+/* 文件操作方法集 */
 static const struct file_operations op = {
     .owner = THIS_MODULE,
     .read = misc_read,
@@ -139,15 +142,15 @@ static const struct file_operations op = {
     .open = misc_open,
     .release = misc_release,
 };
+/* 杂项设备 */
 struct miscdevice my_misc_dev = {
     .minor = MISC_DYNAMIC_MINOR, // 次设备号，赋值为宏 MISC_DYNAMIC_MINOR ，表示系统自动分配
     .name = "my_beep",	// 设备名称
     .fops = &op,
 };
 
-
-// 加载函数
-static int misc_init(void)
+// 与设备匹配之后会执行，必须要实现
+static int platform_probe(struct platform_device *dev)
 {
     int ret;
     LOG_TRACE();
@@ -155,16 +158,70 @@ static int misc_init(void)
     ret = misc_register(&my_misc_dev);
     return ret;
 }
-// 卸载函数
-static void misc_exit(void)
+// 移除设备时会执行
+static int platform_remove(struct platform_device *dev)
 {
     LOG_TRACE();
     misc_deregister(&my_misc_dev);
     deinit_devs(g_dev_list);
 }
+
+// 关闭设备时调用
+static void platform_shutdown(struct platform_device *dev)
+{
+    LOG_TRACE();
+}
+// 进入睡眠时调用
+static int platform_suspend(struct platform_device *dev, pm_message_t state)
+{
+    LOG_TRACE();
+    return 0;
+}
+// 从睡眠模式恢复时调用
+static int platform_resume(struct platform_device *dev)
+{
+    LOG_TRACE();
+    return 0;
+}
+// 优先匹配id_table名字
+static const struct platform_device_id id_table[] = {
+    {.name = "my_beep,pdg", .driver_data = 0}
+};
+
+/* 平台总线驱动 */
+struct platform_driver my_deiver = {
+    .probe = platform_probe,
+    .remove = platform_remove,
+    .shutdown = platform_shutdown,
+    .suspend = platform_suspend,
+    .resume = platform_resume,
+    .id_table = id_table
+};
+
+// 加载函数
+static int platform_driver_init(void)
+{
+    /* 注册平台驱动 */
+    return 0;
+}
+// 卸载函数
+static void platform_driver_exit(void)
+{
+    /* 注销平台驱动 */
+}
+
+/**
+ * 平台总线模型使用之后，可以把 驱动(driver) 与 硬件设备(device) 分离开来，两者可以分别独立加载。
+ * 编写驱动部分 platform_driver 时不必再关心硬件寄存器地址等信息。
+ * 硬件地址寄存器 platform_device 等信息可以通过 驱动模块 或者 设备树 来提供。
+ * 由于实现了 driver 与 device 分离，所以 一份 driver 代码可以匹配多个 device。
+ * 当 driver 与 device 匹配的时候，执行 probe 函数，driver 从中获取 device 的硬件信息。
+ * 原本的 init 和 exit 过程 放在 probe 和 remove 过程中。
+*/
+
 /* 必须使用宏指定 加载函数、卸载函数、GPL声明 */
-module_init(misc_init);
-module_exit(misc_exit);
+module_init(platform_driver_init);
+module_exit(platform_driver_exit);
 MODULE_LICENSE("GPL");
 // 可选的 作者、版本等信息
 MODULE_AUTHOR("pdg");

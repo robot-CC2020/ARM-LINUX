@@ -13,6 +13,13 @@ static void helloworld_exit(void)
 {
     printk("helloworld_exit\n");
 }
+
+/**
+ * 驱动程序 可以编译进内核，也可以编译成模块。
+ * 如果编译进内核， exit函数一般不会执行。
+ * 如果编译成模块，那么可以使用命令动态加载和卸载模块。
+*/
+
 /* 必须使用宏指定 加载函数、卸载函数、GPL声明 */
 module_init(helloworld_init);
 module_exit(helloworld_exit);
