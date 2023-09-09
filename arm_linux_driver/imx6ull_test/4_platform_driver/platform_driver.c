@@ -40,7 +40,7 @@ static int init_devs(struct dev_info devs[])
 {
     /* 根据设备树 获取节点信息 和 GPIO 信息 */
     devs[0].node = of_find_node_by_path("/gpio_beep");
-    devs[0].gpio_beep =  of_get_named_gpio(devs[0].node, "beep-gpios", 0);
+    devs[0].gpio_beep = of_get_named_gpio(devs[0].node, "beep-gpios", 0);
     /* 申请这个GPIO */
     gpio_request(devs[0].gpio_beep, "beep0");
     /* IO设置为输出,默认 输出非有效电平	*/
@@ -134,13 +134,25 @@ static int platform_resume(struct platform_device *dev)
     LOG_TRACE();
     return 0;
 }
+
+// 与设备树节点 compatible 匹配
+struct of_device_id of_id_table[] = {
+    {.compatible = "my_beep_test"},
+    {}, // 哨兵
+};
+
 // 优先匹配id_table名字
 static const struct platform_device_id id_table[] = {
-    {.name = "my_beep,pdg", .driver_data = 0}
+    {.name = "gpio_beep", .driver_data = 0},
+    {}, // 哨兵
 };
 
 /* 平台总线驱动 */
-struct platform_driver my_deiver = {
+struct platform_driver my_deiver = {\
+    .driver = {
+        .name = "gpio_beep", // 必须要有，否则可能引发错误
+        .of_match_table = of_id_table,
+    },
     .probe = platform_probe,
     .remove = platform_remove,
     .shutdown = platform_shutdown,
@@ -152,14 +164,14 @@ struct platform_driver my_deiver = {
 // 加载函数
 static int platform_driver_init(void)
 {
-    init_devs(g_dev_list);
+    LOG_TRACE();
     /* 注册平台驱动 */
     return platform_driver_register(&my_deiver);
 }
 // 卸载函数
 static void platform_driver_exit(void)
 {
-    deinit_devs(g_dev_list);
+    LOG_TRACE();
     /* 注销平台驱动 */
     platform_driver_unregister(&my_deiver);
 }

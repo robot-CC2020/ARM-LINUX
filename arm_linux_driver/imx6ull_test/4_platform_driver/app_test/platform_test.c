@@ -8,7 +8,7 @@
 
 int main(int argc, char *argv[])
 {
-    int loop = 4;
+    int loop = 1;
     int intv_time = 1;
     int ret;
     char wdata = 0;
@@ -27,6 +27,7 @@ int main(int argc, char *argv[])
         wdata = !wdata;
         printf("\n");
     }
+    sleep(5);
     close(fd);
     return 0;
 }

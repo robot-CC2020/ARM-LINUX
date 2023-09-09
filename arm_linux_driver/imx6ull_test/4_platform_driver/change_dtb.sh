@@ -10,8 +10,9 @@ ORIGIN_DIR=$(pwd)
 TARGET_DTS_FILE="${KDIR}/arch/arm/boot/dts/${DTS_NAME}.dts"
 
 echo -e "\n============== modify device tree ==============\n"
-cp "${TARGET_DTS_FILE}" "${TARGET_DTS_FILE}.backup" # 备份原文件
-#编译并替换 设备树
+mv "${TARGET_DTS_FILE}" "${TARGET_DTS_FILE}.backup" # 备份原文件
+cp "${DTS_NAME}.dts" "${TARGET_DTS_FILE}" # 拷贝当前设备树文件
+# 编译并替换 共享文件夹的设备树
 cd "${KDIR}"
 export ARCH=arm
 export CROSS_COMPILE=arm-linux-gnueabihf-

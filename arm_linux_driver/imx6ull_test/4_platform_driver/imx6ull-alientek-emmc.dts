@@ -748,14 +748,14 @@
  * 本次实验使用 pinctrl 和 gpio 子系统，目标设备是蜂鸣器
  */
 / {
-    gpio_beep {
+    gpio_beep { /* gpio_beep 为设备匹配时的名字 */
         compatible = "my_beep_test";
         /* pinctrl 子系统字段 */
         pinctrl-names = "default"; /* 一个状态，只需要指定 pinctrl-0 */
         pinctrl-0 = <&pinctrl_gpio_beep>; /* 使用在对应节点的pinctrl 设置 */
         status = "okay";
         /* GPIO 子系统字段 */
-        beep-gpios = <&gpio5 1 GPIO_ACTIVE_LOW>; /* 属性名自定义，但要与驱动代码相同 */
+        beep-gpios = <&gpio5 1 GPIO_ACTIVE_LOW>; /* 属性名(beep-gpios)自定义，但要与驱动代码相同 */
     };
 };
 
