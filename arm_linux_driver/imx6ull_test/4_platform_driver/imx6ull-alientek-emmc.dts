@@ -765,7 +765,7 @@
         pinctrl_gpio_beep: beepgrp {
             fsl,pins = <
                 /* beep 使用的引脚为 MX6UL_PAD_SNVS_TAMPER1__GPIO5_IO01 */
-                MX6UL_PAD_SNVS_TAMPER1__GPIO5_IO01 0x1b0b0
+                MX6UL_PAD_SNVS_TAMPER1__GPIO5_IO01 0x118a0
             >;
         };
     };

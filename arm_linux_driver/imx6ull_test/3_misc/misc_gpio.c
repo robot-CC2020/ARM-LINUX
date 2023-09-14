@@ -111,7 +111,7 @@ static 	ssize_t misc_read(struct file *file, char __user *buf, size_t n, loff_t 
     LOG_TRACE();
     data = dev_read_data(dev);
     ret = copy_to_user(buf, &data, sizeof(data));
-    return ret;
+    return sizeof(data) - ret;
 }
 static ssize_t misc_write(struct file *file, const char __user *buf, size_t n, loff_t *offset)
 {
@@ -121,7 +121,7 @@ static ssize_t misc_write(struct file *file, const char __user *buf, size_t n, l
     LOG_TRACE();
     ret = copy_from_user(&data, buf, sizeof(data));
     dev_write_data(dev, data);
-    return ret;
+    return sizeof(data) - ret;
 }
 static int misc_release(struct inode *node, struct file *file)
 {

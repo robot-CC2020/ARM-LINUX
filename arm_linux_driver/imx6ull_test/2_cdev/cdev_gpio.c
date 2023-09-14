@@ -95,13 +95,13 @@ static 	int gpio_open(struct inode *node, struct file *file)
     printk("gpio_open\n");
     return 0;
 }
-static 	ssize_t gpio_read(struct file *file, char __user *buf, size_t n, loff_t *offset)
+static ssize_t gpio_read(struct file *file, char __user *buf, size_t n, loff_t *offset)
 {   
     char data;
     unsigned long ret;
     data = dev_read_data();
     ret = copy_to_user(buf, &data, sizeof(data));
-    return ret;
+    return sizeof(data) - ret;
 }
 static ssize_t gpio_write(struct file *file, const char __user *buf, size_t n, loff_t *offset)
 {
@@ -109,7 +109,7 @@ static ssize_t gpio_write(struct file *file, const char __user *buf, size_t n, l
     unsigned long ret;
     ret = copy_from_user(&data, buf, sizeof(data));
     dev_write_data(data);
-    return ret;
+    return sizeof(data) - ret;
 }
 static int gpio_release(struct inode *node, struct file *file)
 {

@@ -33,6 +33,7 @@ struct dev_info g_dev_list[DEVICE_NUM];
 
 static void deinit_devs(struct dev_info devs[])
 {
+    gpio_set_value(devs[0].gpio_beep, 1);
     gpio_free(devs[0].gpio_beep);
 }
 
@@ -44,18 +45,17 @@ static int init_devs(struct dev_info devs[])
     /* 申请这个GPIO */
     gpio_request(devs[0].gpio_beep, "beep0");
     /* IO设置为输出,默认 输出非有效电平	*/
-    gpio_direction_output(devs[0].gpio_beep, 0);
-
+    gpio_direction_output(devs[0].gpio_beep, 1);
     return 0;
 }
 
-static 	int misc_open(struct inode *node, struct file *file)
+static int misc_open(struct inode *node, struct file *file)
 {
     LOG_TRACE();
     file->private_data = &g_dev_list[0]; // open 的时候 给 file->private_data 赋值
     return 0;
 }
-static 	ssize_t misc_read(struct file *file, char __user *buf, size_t n, loff_t *offset)
+static ssize_t misc_read(struct file *file, char __user *buf, size_t n, loff_t *offset)
 {
     char data;
     unsigned long ret;
@@ -63,7 +63,7 @@ static 	ssize_t misc_read(struct file *file, char __user *buf, size_t n, loff_t 
     LOG_TRACE();
     data = gpio_get_value(dev->gpio_beep); // GPIO子系统 方式读取电平
     ret = copy_to_user(buf, &data, sizeof(data));
-    return ret;
+    return sizeof(data) - ret;
 }
 static ssize_t misc_write(struct file *file, const char __user *buf, size_t n, loff_t *offset)
 {
@@ -73,13 +73,11 @@ static ssize_t misc_write(struct file *file, const char __user *buf, size_t n, l
     LOG_TRACE();
     ret = copy_from_user(&data, buf, sizeof(data));
     gpio_set_value(dev->gpio_beep, !!data); // GPIO子系统 方式输出电平
-    return ret;
+    return sizeof(data) - ret;
 }
 static int misc_release(struct inode *node, struct file *file)
 {
-    struct dev_info *dev = file->private_data;
     LOG_TRACE();
-    gpio_set_value(dev->gpio_beep, 0);
     file->private_data = NULL;
     return 0;
 }
