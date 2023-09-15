@@ -25,7 +25,7 @@
 #define DEVICE_NUM          1
 
 struct dev_info {
-    int gpio_beep;              /* gpio编号 */
+    struct gpio_desc *gpiod;    /* gpio描述符 */
 	struct device_node *node;	/* 设备树节点 */
 };
 
@@ -33,19 +33,20 @@ struct dev_info g_dev_list[DEVICE_NUM];
 
 static void deinit_devs(struct dev_info devs[])
 {
-    gpio_set_value(devs[0].gpio_beep, 1);
-    gpio_free(devs[0].gpio_beep);
+    gpiod_set_value(devs[0].gpiod, 0);
+    gpiod_put(devs[0].gpiod); // 释放
 }
 
-static int init_devs(struct dev_info devs[])
+static int init_devs(struct dev_info devs[], struct platform_device *dev)
 {
     /* 根据设备树 获取节点信息 和 GPIO 信息 */
     devs[0].node = of_find_node_by_path("/gpio_beep");
-    devs[0].gpio_beep = of_get_named_gpio(devs[0].node, "beep-gpios", 0);
-    /* 申请这个GPIO */
-    gpio_request(devs[0].gpio_beep, "beep0");
+    devs[0].gpiod = gpiod_get(&dev->dev, "beep"); // 对应设备树属性 beep-gpios
+    if (devs[0].node == NULL || devs[0].gpiod == NULL) {
+        printk("get gpio error");
+    }
     /* IO设置为输出,默认 输出非有效电平	*/
-    gpio_direction_output(devs[0].gpio_beep, 1);
+    gpiod_direction_output(devs[0].gpiod, 0);
     return 0;
 }
 
@@ -61,7 +62,7 @@ static ssize_t misc_read(struct file *file, char __user *buf, size_t n, loff_t *
     unsigned long ret;
     struct dev_info *dev = file->private_data;
     LOG_TRACE();
-    data = gpio_get_value(dev->gpio_beep); // GPIO子系统 方式读取电平
+    data = gpiod_get_value(dev->gpiod); // GPIO子系统 方式读取电平
     ret = copy_to_user(buf, &data, sizeof(data));
     return sizeof(data) - ret;
 }
@@ -72,7 +73,7 @@ static ssize_t misc_write(struct file *file, const char __user *buf, size_t n, l
     struct dev_info *dev = file->private_data;
     LOG_TRACE();
     ret = copy_from_user(&data, buf, sizeof(data));
-    gpio_set_value(dev->gpio_beep, !!data); // GPIO子系统 方式输出电平
+    gpiod_set_value(dev->gpiod, !!data); // GPIO子系统 方式输出电平
     return sizeof(data) - ret;
 }
 static int misc_release(struct inode *node, struct file *file)
@@ -102,7 +103,7 @@ static int platform_probe(struct platform_device *dev)
 {
     int ret;
     LOG_TRACE();
-    init_devs(g_dev_list);
+    init_devs(g_dev_list, dev);
     ret = misc_register(&my_misc_dev);
     return ret;
 }

@@ -755,7 +755,9 @@
         pinctrl-0 = <&pinctrl_gpio_beep>; /* 使用在对应节点的pinctrl 设置 */
         status = "okay";
         /* GPIO 子系统字段 */
-        beep-gpios = <&gpio5 1 GPIO_ACTIVE_LOW>; /* 属性名(beep-gpios)自定义，但要与驱动代码相同 */
+		/* 如果使用老gpio接口，属性名(beep-gpios)自定义，驱动代码 of_get_named_gpio 需要传入整个属性名 */
+        /* 如果使用新gpiod接口，属性名必须为 xxx-gpios，驱动代码 gpiod_get 需要传入 xxx */
+		beep-gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
     };
 };
 
