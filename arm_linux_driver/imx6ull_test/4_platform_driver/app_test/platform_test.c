@@ -8,7 +8,7 @@
 
 int main(int argc, char *argv[])
 {
-    int loop = 1;
+    int loop = 5;
     int intv_time = 1;
     int ret;
     char wdata = 0;
