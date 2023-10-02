@@ -745,7 +745,7 @@
 };
 /*
  * 基于正点原子 alpha 开发板的实验
- * 本次实验使用 pinctrl 和 gpio 子系统，目标设备是按键
+ * 本次实验使用 pinctrl 和 gpio 子系统, 中断系统，目标设备是按键
  */
 / {
     gpio_key { /* gpio_key 为设备匹配时的名字 */
@@ -758,6 +758,9 @@
 		/* 如果使用老gpio接口，属性名(key-gpios)自定义，驱动代码 of_get_named_gpio 需要传入整个属性名 */
         /* 如果使用新gpiod接口，属性名必须为 xxx-gpios，驱动代码 gpiod_get 需要传入 xxx */
 		key-gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
+		/* 中断系统字段 */
+		interrupt-parent = <&gpio1>; /* 中断控制器父节点 为 gpio1 */
+		interrupts = <18 IRQ_TYPE_EDGE_BOTH>; /* 根据 binding 文档，第一个cell表示 IO18，第二个cell表示触发方式  */
     };
 };
 

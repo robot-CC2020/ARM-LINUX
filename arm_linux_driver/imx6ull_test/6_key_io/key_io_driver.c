@@ -15,6 +15,9 @@
 #include <asm/uaccess.h>
 /* gpio子系统 */
 #include <linux/of_gpio.h>
+/* 中断子系统 */
+#include <linux/interrupt.h>
+#include <linux/of_irq.h>
 
 #if 1
     #define LOG_TRACE()  printk("\nkdebug: [file]:%s [func]:%s [line]:%d\n", __FILE__, __FUNCTION__, __LINE__)
@@ -27,6 +30,7 @@
 struct key_dev_info {
     struct gpio_desc *gpiod;    /* gpio描述符 */
 	struct device_node *node;	/* 设备树节点 */
+    unsigned int irq;           /* 中断资源 */
 
     struct cdev cdev;           /* 字符设备 */
 
@@ -82,14 +86,30 @@ struct file_operations op = {
     .release = file_release,
 };
 
+// 中断处理函数
+static irqreturn_t key_irq_handler(int irq, void *dev)
+{
+    struct key_dev_info *dev_info = dev;
+    char data;
+    data = gpiod_get_value(dev_info->gpiod);
+    printk("key_irq_handler  data = %d\n", data);
+    return IRQ_HANDLED;
+}
+
 // 与设备匹配之后会执行，必须要实现
 static int platform_probe(struct platform_device *dev)
 {
     int ret = 0;
-    dev_t dev_number;
+    dev_t dev_number = 0;
+    struct device_node *node = NULL;
+    unsigned int irq = 0;
     LOG_TRACE();
-    alloc_chrdev_region(&dev_number, 0, DEVICE_NUM, GPIO_DEV_NAME); // 分配设备号并注册， 次设备号为1个
+
+    node = of_find_compatible_node(NULL, NULL, "my_key_test");
+    irq = irq_of_parse_and_map(node, 0); // index 为 0，表示第一个, 也可以使用 gpiod_to_irq 获取，中断号相同
+
     // 字符设备
+    alloc_chrdev_region(&dev_number, 0, DEVICE_NUM, GPIO_DEV_NAME); // 分配设备号并注册，次设备号为1个
     cdev_init(&g_dev_list[0].cdev, &op); // 初始化 字符设备，绑定 file_operations
     ret = cdev_add(&g_dev_list[0].cdev, dev_number, DEVICE_NUM); // 把字符设备添加到系统中，使用设备号
     // 赋值
@@ -97,13 +117,21 @@ static int platform_probe(struct platform_device *dev)
     g_dev_list[0].class = class_create(THIS_MODULE, GPIO_DEV_NAME);
     g_dev_list[0].dev_node = device_create(g_dev_list[0].class, NULL, dev_number, NULL, GPIO_DEV_NAME); // 创建设备文件, 使用设备号
     g_dev_list[0].gpiod = gpiod_get(&dev->dev, "key");
+    g_dev_list[0].node = node;
+    g_dev_list[0].irq = irq;
     gpiod_direction_input(g_dev_list[0].gpiod);
+    ret = request_irq(irq, key_irq_handler, IRQ_TYPE_EDGE_BOTH, "my_key_irq", &g_dev_list[0]);
+    if (ret != 0) {
+        printk(" reqest irq error !");
+        return ret;
+    }
     return ret;
 }
 // 移除设备时会执行
 static int platform_remove(struct platform_device *dev)
 {
     LOG_TRACE();
+    free_irq(g_dev_list[0].irq, &g_dev_list[0]); // 释放中断资源
     gpiod_put(g_dev_list[0].gpiod); // 释放GPIO
     device_destroy(g_dev_list[0].class, g_dev_list[0].dev_number); // 销毁设备文件, 使用设备号
     class_destroy(g_dev_list[0].class); // 销毁类
