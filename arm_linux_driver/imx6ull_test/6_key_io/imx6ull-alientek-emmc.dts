@@ -760,7 +760,7 @@
 		key-gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
 		/* 中断系统字段 */
 		interrupt-parent = <&gpio1>; /* 中断控制器父节点 为 gpio1 */
-		interrupts = <18 IRQ_TYPE_EDGE_BOTH>; /* 根据 binding 文档，第一个cell表示 IO18，第二个cell表示触发方式  */
+		interrupts = <18 IRQ_TYPE_EDGE_RISING>; /* 根据 binding 文档，第一个cell表示 IO18，第二个cell表示触发方式  */
     };
 };
 

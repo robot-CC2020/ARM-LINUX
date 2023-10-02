@@ -15,9 +15,14 @@
 #include <asm/uaccess.h>
 /* gpio子系统 */
 #include <linux/of_gpio.h>
-/* 中断子系统 */
+/* 中断系统 */
 #include <linux/interrupt.h>
 #include <linux/of_irq.h>
+/* 等待队列 */
+#include <linux/wait.h>
+#include <linux/sched.h>
+/* poll 机制 */
+#include <linux/poll.h>
 
 #if 1
     #define LOG_TRACE()  printk("\nkdebug: [file]:%s [func]:%s [line]:%d\n", __FILE__, __FUNCTION__, __LINE__)
@@ -27,20 +32,29 @@
 
 #define DEVICE_NUM 1
 #define GPIO_DEV_NAME "my_key"
+#define DELAY_TIME_MS   20
+#define DATA_BUFF_SIZE  20
+
 struct key_dev_info {
-    struct gpio_desc *gpiod;    /* gpio描述符 */
-	struct device_node *node;	/* 设备树节点 */
-    unsigned int irq;           /* 中断资源 */
+    struct gpio_desc *gpiod;        /* gpio描述符 */
+	struct device_node *node;	    /* 设备树节点 */
+    unsigned int irq;               /* 中断号 */
+    struct timer_list timerOff;     /* 按键消抖定时器 */
 
-    struct cdev cdev;           /* 字符设备 */
+    char dataBuf[DATA_BUFF_SIZE];   /* 可读缓存 */
+    int dataSize;                   /* 等待队列变量，可读数据量 */
+    struct fasync_struct *fasync;   /* 异步信号使用 */
 
-    dev_t dev_number;           /* 设备号 */
-    struct class *class;        /* 类 */
-    struct device *dev_node;    /* 设备节点 */
+    struct cdev cdev;               /* 字符设备 */
+
+    dev_t dev_number;               /* 设备号 */
+    struct class *class;            /* 类 */
+    struct device *dev_node;        /* 设备节点 */
 };
 
 struct key_dev_info g_dev_list[DEVICE_NUM];
 
+DECLARE_WAIT_QUEUE_HEAD(read_wq);
 
 static int file_open(struct inode *node, struct file *file)
 {
@@ -48,54 +62,102 @@ static int file_open(struct inode *node, struct file *file)
     return 0;
 }
 static ssize_t file_read(struct file *file, char __user *buf, size_t n, loff_t *offset)
-{   
-    char data;
-    unsigned long ret;
-    struct key_dev_info *dev_info = NULL;
-    if (file == NULL || file->private_data == NULL) {
+{
+    struct key_dev_info *dev_info = file->private_data;
+    int readSize;
+    // 支持 O_NONBLOCK 标志位
+    if ((file->f_flags & O_NONBLOCK) && dev_info->dataSize == 0) {
+        return -EAGAIN; // error 会被设置为 EAGAIN
+    }
+    // 等待队列处理
+    wait_event_interruptible(read_wq, dev_info->dataSize);
+    if (copy_to_user(buf, dev_info->dataBuf, dev_info->dataSize) != 0) {
+        printk("copy_to_user error !\n");
         return -1;
     }
-    dev_info = file->private_data;
-    data = gpiod_get_value(dev_info->gpiod);
-    ret = copy_to_user(buf, &data, sizeof(data));
-    return sizeof(data) - ret;
+    readSize = dev_info->dataSize;
+    dev_info->dataSize = 0;
+    return readSize;
 }
+
+static ssize_t internal_write(struct key_dev_info *dev_info, const char __user *buf, size_t n, loff_t *offset)
+{
+    int dataSize = dev_info->dataSize;
+    int copySize = DATA_BUFF_SIZE - dataSize;
+    if (copySize > n) {
+        copySize = (int)n;
+    }
+    // 等待队列处理
+    if (copy_from_user(dev_info->dataBuf + dataSize, buf, copySize) != 0) {
+        return -1;
+    }
+    dev_info->dataSize += copySize;
+    // 唤醒等待队列
+    wake_up_interruptible(&read_wq);
+
+    kill_fasync(&dev_info->fasync, SIGIO, POLLIN);
+    return copySize;
+}
+
 static ssize_t file_write(struct file *file, const char __user *buf, size_t n, loff_t *offset)
 {
-    char data;
-    unsigned long ret;
-    struct key_dev_info *dev_info = NULL;
-    if (file == NULL || file->private_data == NULL) {
-        return -1;
-    }
-    dev_info = file->private_data;
-    ret = copy_from_user(&data, buf, sizeof(data));
-    gpiod_set_value(dev_info->gpiod, !!data);
-    return sizeof(data) - ret;
+    return internal_write(file->private_data, buf, n, offset);
 }
 static int file_release(struct inode *node, struct file *file)
 {
     file->private_data = NULL;
     return 0;
 }
+static unsigned int file_poll(struct file *file, struct poll_table_struct *p)
+{
+    unsigned int mask = 0;
+    struct key_dev_info *dev_info = file->private_data;
+    poll_wait(file, &read_wq, p); // 名字中带wait，但是不阻塞
+    if (dev_info->dataSize > 0) {
+        mask |= POLLIN;
+    }
+    return mask;
+}
+static int file_fasync(int fd, struct file *file, int on)
+{
+    struct key_dev_info *dev_info = file->private_data;
+    return fasync_helper(fd, file, on, &dev_info->fasync);
+}
+
 struct file_operations op = {
     .owner = THIS_MODULE,
     .read = file_read,
     .write = file_write,
     .open = file_open,
     .release = file_release,
+    .poll = file_poll,
+    .fasync = file_fasync,
 };
 
+// 按键松开 定时器消抖处理
+static void timerOffHandler(unsigned long arg)
+{
+    char data[1] = {1}; // 写入数据
+    char status;
+    (void)arg;
+    status = gpiod_get_value(g_dev_list[0].gpiod);
+    if (status == 0) { // 仍然是松开状态
+        internal_write(&g_dev_list[0], data, sizeof(data), NULL);
+    }
+}
 // 中断处理函数
 static irqreturn_t key_irq_handler(int irq, void *dev)
 {
     struct key_dev_info *dev_info = dev;
     char data;
     data = gpiod_get_value(dev_info->gpiod);
-    printk("key_irq_handler  data = %d\n", data);
+    if (data == 0) {
+        // 松开按键， 触发定时任务
+        mod_timer(&dev_info->timerOff,
+                  jiffies + msecs_to_jiffies(DELAY_TIME_MS));
+    }
     return IRQ_HANDLED;
 }
-
 // 与设备匹配之后会执行，必须要实现
 static int platform_probe(struct platform_device *dev)
 {
@@ -120,17 +182,21 @@ static int platform_probe(struct platform_device *dev)
     g_dev_list[0].node = node;
     g_dev_list[0].irq = irq;
     gpiod_direction_input(g_dev_list[0].gpiod);
-    ret = request_irq(irq, key_irq_handler, IRQ_TYPE_EDGE_BOTH, "my_key_irq", &g_dev_list[0]);
+    // IRQ_TYPE_EDGE_RISING 表示真实物理电平变化，而不是GPIOD 的逻辑电平，此处 按键弹起 为 上升沿
+    ret = request_irq(irq, key_irq_handler, IRQ_TYPE_EDGE_RISING, "my_key_irq", &g_dev_list[0]);
     if (ret != 0) {
         printk(" reqest irq error !");
         return ret;
     }
+    init_timer(&g_dev_list[0].timerOff); // 初始化定时器
+    g_dev_list[0].timerOff.function = timerOffHandler;
     return ret;
 }
 // 移除设备时会执行
 static int platform_remove(struct platform_device *dev)
 {
     LOG_TRACE();
+    del_timer_sync(&g_dev_list[0].timerOff); // 释放定时器资源
     free_irq(g_dev_list[0].irq, &g_dev_list[0]); // 释放中断资源
     gpiod_put(g_dev_list[0].gpiod); // 释放GPIO
     device_destroy(g_dev_list[0].class, g_dev_list[0].dev_number); // 销毁设备文件, 使用设备号
@@ -139,7 +205,6 @@ static int platform_remove(struct platform_device *dev)
     unregister_chrdev_region(g_dev_list[0].dev_number, DEVICE_NUM); // 反注册
     return 0;
 }
-
 // 关闭设备时调用
 static void platform_shutdown(struct platform_device *dev)
 {
