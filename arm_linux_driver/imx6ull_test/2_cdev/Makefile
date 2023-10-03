@@ -13,4 +13,4 @@ test:app_test/gpio_test.c
 
 # 删除产生的文件
 clean:
-	rm -r *.ko *.mod.o *.mod.c *.symvers *.order
+	rm -r *.ko *.mod.o *.mod.c *.symvers *.order *.o
